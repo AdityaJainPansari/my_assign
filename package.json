@@ -1,0 +1,20 @@
+{
+  "name": "myassign",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "ndc-test replay --endpoint http://localhost:8080 --snapshots-dir snapshots"
+  },
+  "author": "Aditya Jain Pansari",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@hasura/ndc-sdk-typescript": "^4.6.0",
+    "mysql2": "^3.9.7",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "ndc-test": "^1.0.1"
+  }
+}
