@@ -26,7 +26,7 @@ Queries supported as of now:
 2. Offset
 3. Where:
     1. "and" : AND
-    2. Comparison Operators (Only for Column <compared to> Scalar):
+    2. Comparison Operators (Only for Column `compared to` Scalar):
         1. "_lte" : <=
         2. "_eq" : =
         3. "_like" : LIKE
