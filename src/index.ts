@@ -206,10 +206,22 @@ function visit_expression(
           } else {
               return "TRUE";
           }
+      case "or":
+          if (expr.expressions.length > 0) {
+              return expr.expressions.map(e => visit_expression_with_parens(parameters, e)).join(" OR ");
+          } else {
+              return "TRUE";
+          }
       case "binary_comparison_operator":
           switch (expr.operator) {
               case '_lte':
                   return `${visit_comparison_target(expr.column)} <= ${visit_comparison_value(parameters, expr.value)}`
+              case '_lt':
+                  return `${visit_comparison_target(expr.column)} < ${visit_comparison_value(parameters, expr.value)}`
+              case '_gte':
+                  return `${visit_comparison_target(expr.column)} >= ${visit_comparison_value(parameters, expr.value)}`
+              case '_gt':
+                  return `${visit_comparison_target(expr.column)} > ${visit_comparison_value(parameters, expr.value)}`
               case '_eq':
                   return `${visit_comparison_target(expr.column)} = ${visit_comparison_value(parameters, expr.value)}`
               case '_like':

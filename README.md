@@ -25,11 +25,15 @@ Queries supported as of now:
 1. Limit
 2. Offset
 3. Where:
-    1. "and" : AND
-    2. Comparison Operators (Only for Column `compared to` Scalar):
+    1. "and":   AND
+    2. "or" :   OR
+    3. Comparison Operators (Only for Column `compared to` Scalar):
         1. "_lte" : <=
-        2. "_eq" : =
-        3. "_like" : LIKE
-        4. "_in" : IN
+        2. "_lt" : <
+        3. "_gte" : >=
+        4. "_gt" : >
+        5. "_eq" : =
+        6. "_like" : LIKE
+        7. "_in" : IN
 4. Order By (Multilevel Order By supported)
 5. 
