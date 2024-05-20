@@ -85,21 +85,20 @@ function getSchema(configuration) {
             procedures,
             scalar_types,
         };
-        throw new Error("Function not implemented.");
+        // throw new Error("Function not implemented.");
     });
 }
 function query(configuration, state, request) {
     return __awaiter(this, void 0, void 0, function* () {
         // takes in the queryRequest and returns the rows from the database
         console.log(JSON.stringify(request, null, 2));
-        const rows = request.query.fields && (yield fetch_rows(state, request));
+        const rows = yield fetch_rows(state, request);
         return [{ rows }];
     });
 }
-function fetch_rows(state, request) {
+function fetch_sql_query(request, parameters) {
     return __awaiter(this, void 0, void 0, function* () {
-        // takes in the queryRequest and forms a SQL query, before sending it to the DBMS for execution
-        // returns back the rows of the created View
+        // takes in the query details and parses the information to form and return a SQL query
         const fields = [];
         for (const fieldName in request.query.fields) {
             if (Object.prototype.hasOwnProperty.call(request.query.fields, fieldName)) {
@@ -113,12 +112,66 @@ function fetch_rows(state, request) {
                 }
             }
         }
-        const parameters = [];
+        const target_list = [];
+        for (const aggregateName in request.query.aggregates) {
+            if (Object.prototype.hasOwnProperty.call(request.query.aggregates, aggregateName)) {
+                const aggregate = request.query.aggregates[aggregateName];
+                switch (aggregate.type) {
+                    case 'star_count':
+                        target_list.push(`COUNT(1) AS ${aggregateName}`);
+                        break;
+                    case 'column_count':
+                        target_list.push(`COUNT(${aggregate.distinct ? 'DISTINCT ' : ''}${aggregate.column}) AS ${aggregateName}`);
+                        break;
+                    case 'single_column':
+                        switch (aggregate.function) {
+                            case 'sum':
+                                target_list.push(`SUM(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'avg':
+                                target_list.push(`AVG(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'min':
+                                target_list.push(`MIN(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'max':
+                                target_list.push(`MAX(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'stddev_pop':
+                                target_list.push(`STDDEV_POP(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'stddev_samp':
+                                target_list.push(`STDDEV_SAMP(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'var_pop':
+                                target_list.push(`VAR_POP(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'var_samp':
+                                target_list.push(`VAR_SAMP(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            case 'csv':
+                                target_list.push(`GROUP_CONCAT(${aggregate.column}) AS ${aggregateName}`);
+                                break;
+                            default:
+                                throw new ndc_sdk_typescript_1.BadRequest("Unknown aggregate function");
+                        }
+                }
+            }
+        }
         const limit_clause = request.query.limit == null ? "" : `LIMIT ${request.query.limit}`;
         const offset_clause = request.query.offset == null ? "" : `OFFSET ${request.query.offset}`;
         const where_clause = request.query.predicate == null ? "" : `WHERE ${visit_expression(parameters, request.query.predicate)}`;
         const order_by_clause = request.query.order_by == null ? "" : `ORDER BY ${visit_order_by_elements(request.query.order_by.elements)}`;
-        let sql = `SELECT ${fields.length ? fields.join(", ") : '1 AS __empty'} FROM ${request.collection} ${where_clause} ${order_by_clause} ${limit_clause} ${offset_clause}`;
+        let sql = `SELECT ${fields.length ? fields.join(", ") : '1 AS __empty'}, ${target_list.length ? target_list.join(", ") : "1 AS __empty"} FROM ${request.collection} ${where_clause} ${order_by_clause} ${limit_clause} ${offset_clause}`;
+        return sql;
+    });
+}
+function fetch_rows(state, request) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // takes in the queryRequest and forms a SQL query using 'fetch_sql_query' funciton, before sending it to the DBMS for execution
+        // returns back the rows of the created View
+        const parameters = [];
+        let sql = yield fetch_sql_query(request, parameters);
         // console.log(JSON.stringify({ sql, parameters }, null, 2));
         parameters.forEach((value) => {
             if (typeof value === 'string') {
@@ -179,14 +232,32 @@ function visit_expression(parameters, expr) {
             else {
                 return "TRUE";
             }
+        case "or":
+            if (expr.expressions.length > 0) {
+                return expr.expressions.map(e => visit_expression_with_parens(parameters, e)).join(" OR ");
+            }
+            else {
+                return "TRUE";
+            }
         case "binary_comparison_operator":
             switch (expr.operator) {
                 case '_lte':
                     return `${visit_comparison_target(expr.column)} <= ${visit_comparison_value(parameters, expr.value)}`;
+                case '_lt':
+                    return `${visit_comparison_target(expr.column)} < ${visit_comparison_value(parameters, expr.value)}`;
+                case '_gte':
+                    return `${visit_comparison_target(expr.column)} >= ${visit_comparison_value(parameters, expr.value)}`;
+                case '_gt':
+                    return `${visit_comparison_target(expr.column)} > ${visit_comparison_value(parameters, expr.value)}`;
                 case '_eq':
                     return `${visit_comparison_target(expr.column)} = ${visit_comparison_value(parameters, expr.value)}`;
                 case '_like':
                     return `${visit_comparison_target(expr.column)} LIKE ${visit_comparison_value(parameters, expr.value)}`;
+                case '_contains':
+                    // console.log("%"+expr.value.value+"%");
+                    let temp = expr;
+                    temp.value.value = "%" + expr.value.value + "%";
+                    return `${visit_comparison_target(expr.column)} LIKE ${visit_comparison_value(parameters, temp.value)}`;
                 case '_in':
                     return `${visit_comparison_target(expr.column)} IN ${visit_comparison_value(parameters, expr.value)}`;
                 default:
