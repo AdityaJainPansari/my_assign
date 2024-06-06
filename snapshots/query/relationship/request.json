@@ -1,0 +1,58 @@
+{
+    "collection": "Album",
+    "query": {
+      "fields": {
+        "Name": {
+          "type": "column",
+          "column": "Title",
+          "fields": null
+        },
+        "Tracks": {
+          "type": "relationship",
+          "query":{
+            "fields": {
+              "Name": {
+                "type": "column",
+                "column": "Name",
+                "fields": null
+              }
+            }
+          },
+          "relationship": "AlbumTracks",
+          "arguments": {}
+        }
+      },
+      "predicate": {
+        "type": "and",
+        "expressions": [
+          {
+            "type": "binary_comparison_operator",
+            "column": {
+              "type": "column",
+              "name": "Title",
+              "path": []
+            },
+            "operator": "_like",
+            "value": {
+              "type": "scalar",
+              "value": "%Rock%"
+            }
+          }
+        ]
+      },
+      "limit": 30,
+      "offset": 0
+    },
+    "arguments": {},
+    "collection_relationships": {
+      "AlbumTracks": {
+        "column_mapping": {
+          "AlbumId": "AlbumId"
+        },
+        "relationship_type": "array",
+        "arguments": {},
+        "target_collection": "Track"
+      }
+    }
+  }
+  

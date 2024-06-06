@@ -92,6 +92,12 @@ function query(configuration, state, request) {
     return __awaiter(this, void 0, void 0, function* () {
         // takes in the queryRequest and returns the rows from the database
         console.log(JSON.stringify(request, null, 2));
+        if (!request.query.fields && !request.query.aggregates) {
+            throw new ndc_sdk_typescript_1.BadRequest("No fields or aggregates specified");
+        }
+        if (request.query.fields && request.query.aggregates) {
+            throw new ndc_sdk_typescript_1.BadRequest("Both fields and aggregates specified. Currently GroupBy is not supported. Please specify only one of them.");
+        }
         const rows = yield fetch_rows(state, request);
         return [{ rows }];
     });
@@ -100,12 +106,38 @@ function fetch_sql_query(request, parameters) {
     return __awaiter(this, void 0, void 0, function* () {
         // takes in the query details and parses the information to form and return a SQL query
         const fields = [];
+        const collection_list = [];
+        collection_list.push(request.collection);
+        const additional_predicates = [];
         for (const fieldName in request.query.fields) {
             if (Object.prototype.hasOwnProperty.call(request.query.fields, fieldName)) {
                 const field = request.query.fields[fieldName];
                 switch (field.type) {
                     case 'column':
-                        fields.push(`${field.column} AS ${fieldName}`);
+                        fields.push(`${request.collection}.${field.column} AS ${request.collection}_${fieldName}`);
+                        break;
+                    case 'relationship':
+                        const relationship = request.collection_relationships[field.relationship];
+                        if (relationship === undefined) {
+                            throw new ndc_sdk_typescript_1.BadRequest("Undefined relationship");
+                        }
+                        collection_list.push(relationship.target_collection);
+                        for (const relationshipfieldName in field.query.fields) {
+                            if (Object.prototype.hasOwnProperty.call(field.query.fields, relationshipfieldName)) {
+                                const relationshipfield = field.query.fields[relationshipfieldName];
+                                switch (relationshipfield.type) {
+                                    case 'column':
+                                        fields.push(`${relationship.target_collection}.${relationshipfield.column} AS ${fieldName}_${relationshipfieldName}`);
+                                        break;
+                                    default:
+                                        throw new Error("Not supported");
+                                }
+                            }
+                        }
+                        for (const src_column in relationship.column_mapping) {
+                            const tgt_column = relationship.column_mapping[src_column];
+                            additional_predicates.push(`${request.collection}.${src_column} = ${relationship.target_collection}.${tgt_column}`);
+                        }
                         break;
                     default:
                         throw new Error("Not supported");
@@ -158,11 +190,12 @@ function fetch_sql_query(request, parameters) {
                 }
             }
         }
+        console.log(JSON.stringify({ fields, collection_list, additional_predicates, target_list }, null, 2));
         const limit_clause = request.query.limit == null ? "" : `LIMIT ${request.query.limit}`;
         const offset_clause = request.query.offset == null ? "" : `OFFSET ${request.query.offset}`;
-        const where_clause = request.query.predicate == null ? "" : `WHERE ${visit_expression(parameters, request.query.predicate)}`;
+        const where_clause = request.query.predicate == null ? "" : `WHERE ${visit_expression(parameters, request.query.predicate)} ${additional_predicates.length ? `AND ${additional_predicates.join(" AND ")}` : ''}`;
         const order_by_clause = request.query.order_by == null ? "" : `ORDER BY ${visit_order_by_elements(request.query.order_by.elements)}`;
-        let sql = `SELECT ${fields.length ? fields.join(", ") : '1 AS __empty'}, ${target_list.length ? target_list.join(", ") : "1 AS __empty"} FROM ${request.collection} ${where_clause} ${order_by_clause} ${limit_clause} ${offset_clause}`;
+        let sql = `SELECT ${fields.length ? fields.join(", ") : '1 AS __empty'}, ${target_list.length ? target_list.join(", ") : "1 AS __empty"} FROM ${collection_list.join(", ")} ${where_clause} ${order_by_clause} ${limit_clause} ${offset_clause}`;
         return sql;
     });
 }
@@ -189,7 +222,7 @@ function fetch_rows(state, request) {
                 sql = sql.replace('?', value.toString());
             }
         });
-        // console.log(JSON.stringify({ sql}, null, 2));
+        console.log(JSON.stringify({ sql }, null, 2));
         const [rows] = yield state.db.query(sql, []);
         // console.log(JSON.stringify({ rows}, null, 2));
         return rows.map((row) => { delete row.__empty; return row; });

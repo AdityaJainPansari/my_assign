@@ -21,8 +21,10 @@ node dist/index.js serve --configuration .
 ```
 
 Queries supported as of now:
+(Please refer to `snapshots` folder for sample queries and to understand syntax.)
 
-1. Aggregates: (GROUP BY not supported yet)
+1. Aggregates:
+    (GROUP BY not supported yet, hence kindly do not make combined request for fields and aggregate functions.)
     1. sum
     2. min
     3. max
@@ -32,6 +34,8 @@ Queries supported as of now:
     7. var_samp
     8. csv (GROUP_CONCAT)
     9. avg
+    10. COUNT(*)
+    11. COUNT(\<column_name\>) (DISTINCT or not)
 2. Limit
 3. Offset
 4. Where:
@@ -47,4 +51,4 @@ Queries supported as of now:
         6. "_contains" : CONTAINS (LIKE %\<expr\>%)
         7. "_in" : IN
 5. Order By (Multilevel Order By supported)
-6. 
+6. You can connect two or more tables by using the 'relationship' type in fields.
